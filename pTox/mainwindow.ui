@@ -14,7 +14,7 @@
    <string>MainWindow</string>
   </property>
   <widget class="QWidget" name="centralWidget">
-   <widget class="QWidget" name="">
+   <widget class="QWidget" name="layoutWidget">
     <property name="geometry">
      <rect>
       <x>60</x>
@@ -74,6 +74,36 @@
      <height>22</height>
     </rect>
    </property>
+   <widget class="QMenu" name="menuAccount">
+    <property name="title">
+     <string>Account</string>
+    </property>
+    <addaction name="actionSet_name"/>
+    <addaction name="actionSet_status"/>
+    <addaction name="separator"/>
+    <addaction name="actionView"/>
+    <addaction name="separator"/>
+    <addaction name="actionEXIT"/>
+   </widget>
+   <widget class="QMenu" name="menuFriend">
+    <property name="title">
+     <string>Friend</string>
+    </property>
+    <addaction name="actionAdd_new"/>
+    <addaction name="actionRemove"/>
+   </widget>
+   <widget class="QMenu" name="menuHelp">
+    <property name="title">
+     <string>Help</string>
+    </property>
+    <addaction name="actionVersion"/>
+    <addaction name="actionAuthor"/>
+    <addaction name="separator"/>
+    <addaction name="actionelp"/>
+   </widget>
+   <addaction name="menuAccount"/>
+   <addaction name="menuFriend"/>
+   <addaction name="menuHelp"/>
   </widget>
   <widget class="QToolBar" name="mainToolBar">
    <attribute name="toolBarArea">
@@ -83,6 +113,69 @@
     <bool>false</bool>
    </attribute>
   </widget>
+  <action name="actionSet_name">
+   <property name="text">
+    <string>Set name</string>
+   </property>
+   <property name="shortcut">
+    <string>Ctrl+N</string>
+   </property>
+  </action>
+  <action name="actionSet_status">
+   <property name="text">
+    <string>Set status</string>
+   </property>
+   <property name="shortcut">
+    <string>Ctrl+S</string>
+   </property>
+  </action>
+  <action name="actionView">
+   <property name="text">
+    <string>View</string>
+   </property>
+   <property name="shortcut">
+    <string>Ctrl+V</string>
+   </property>
+  </action>
+  <action name="actionAdd_new">
+   <property name="text">
+    <string>Add new</string>
+   </property>
+   <property name="shortcut">
+    <string>Ctrl+A</string>
+   </property>
+  </action>
+  <action name="actionRemove">
+   <property name="text">
+    <string>Remove</string>
+   </property>
+   <property name="shortcut">
+    <string>Ctrl+R</string>
+   </property>
+  </action>
+  <action name="actionVersion">
+   <property name="text">
+    <string>Version</string>
+   </property>
+  </action>
+  <action name="actionAuthor">
+   <property name="text">
+    <string>Author</string>
+   </property>
+  </action>
+  <action name="actionelp">
+   <property name="text">
+    <string>Help</string>
+   </property>
+  </action>
+  <action name="actionEXIT">
+   <property name="text">
+    <string>EXIT</string>
+   </property>
+   <property name="shortcut">
+    <string>Ctrl+Q</string>
+   </property>
+  </action>
  </widget>
  <layoutdefault spacing="6" margin="11"/>
  <resources/>

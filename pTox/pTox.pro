@@ -35,7 +35,8 @@ SOURCES += \
 
 HEADERS += \
         mainwindow.h \
-    ptox.h
+    ptox.h \
+    definitions.h
 
 FORMS += \
         mainwindow.ui

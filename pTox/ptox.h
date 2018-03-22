@@ -6,6 +6,13 @@
 #include <tox/tox.h>
 #include <tox/toxav.h>
 
+#include <iostream>
+#include <sstream>
+#include <string>
+
+
+#include "definitions.h"
+
 class pTox : public QObject
 {
     Q_OBJECT
@@ -39,7 +46,8 @@ private:
     std::vector<toxFriend> friendVector;
 
 public:
-    pTox(bool, std::string);
+    pTox() {}
+    pTox(bool newAccount, std::string FilePath);
     ~pTox();
     std::string getConfiguration();
 
@@ -51,17 +59,16 @@ public:
 signals:
     void changeTable();
     void appendText(QString);
-    void friendRequest(QString);
-    void friendRequest(std::string, QString);
     void friendChange(uint32_t);
-
+    void friendRequestRecived(std::string, QString);
 
 public slots:
     void setName(std::string Name);
-    void setStatus(STATUS status);
+    void setStatus(pTox::STATUS status);
     void setStatus(std::string StatusMsg);
 
     void addFriend(uint32_t);
+    void sendRequest(std::string Address, std::string Message);
     void removeFriend(uint32_t);
     void clearFriendVector();
 
@@ -74,11 +81,13 @@ protected:
     std::string hex2bin(const std::string &value);
     int hex2bin(unsigned char *const bin, const size_t bin_maxlen, const char *const hex, const size_t hex_len, const char *const ignore, size_t *const bin_len, const char **const hex_end);
     inline std::string Status2String(STATUS s);
+    inline std::string Connection2String(TOX_CONNECTION c);
     bool CreateNewAccount();
     bool ReadFile();
     bool CreateFile();
     bool SaveProfile();
     void Connect();
+    void updateToxFriendlList();
 
 private:
     /*--- CALLBACKS ---*/
@@ -161,11 +170,11 @@ private:
     */
     static void callback_audio_receive_frame(ToxAV *av, uint32_t friend_number, const int16_t *pcm, size_t sample_count, uint8_t channels, uint32_t sampling_rate, void *user_data);
     /*--- ERRORS ---*/
-    std::string toxav_new_error(TOXAV_ERR_NEW error);
     std::string tox_set_info_error(TOX_ERR_SET_INFO error);
     std::string tox_add_friend_error(TOX_ERR_FRIEND_ADD error);
     std::string tox_friend_querry_error(TOX_ERR_FRIEND_QUERY error);
     std::string tox_send_message_error(TOX_ERR_FRIEND_SEND_MESSAGE error);
+    std::string toxav_new_error(TOXAV_ERR_NEW error);
 };
 
 #endif // PTOX_H
