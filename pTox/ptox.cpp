@@ -186,6 +186,7 @@ void pTox::addFriend(uint32_t friendNumber)
         hex2bin(f.friendAddressBin, sizeof(f.friendAddressBin), (const char*)f.friendAddressHex, sizeof(f.friendAddressHex), NULL, NULL, NULL);
     }
     friendVector.push_back(f);
+    updateToxFriendlList();
     SaveProfile();
 
     emit changeTable();
@@ -202,6 +203,7 @@ void pTox::sendRequest(std::string Address, std::string Message)
         return;
     }
     addFriend(FriendNumber);
+    updateToxFriendlList();
     SaveProfile();
 
     emit changeTable();
@@ -214,6 +216,9 @@ void pTox::removeFriend(uint32_t friendNumber)
     if (error != TOX_ERR_FRIEND_DELETE_OK) {
         std::cerr << "ERROR remove friend - Friend not found" << std::endl;
     }
+
+    updateToxFriendlList();
+    SaveProfile();
 
     emit changeTable();
 }
@@ -264,6 +269,8 @@ void pTox::clearFriendVector()
     }
 
     delete [] FriendList;
+    updateToxFriendlList();
+    SaveProfile();
 
     emit changeTable();
 }
@@ -552,6 +559,8 @@ void pTox::updateToxFriendlList()
 
     delete [] FriendList;
 
+    SaveProfile();
+
     emit changeTable();
 }
 
@@ -592,23 +601,36 @@ void pTox::callback_friend_request(Tox *tox, const uint8_t *public_key, const ui
 {
     std::cout << "Maybe new friend send request: " << message << std::endl;;
     if (PTOX) {
-        //emit PTOX->friendRequestRecived(PTOX->uint82string(const_cast<uint8_t*>(public_key), length), QString::fromLocal8Bit(message, length));
+        QString temp = QString::fromLocal8Bit((char*)public_key, TOX_PUBLIC_KEY_SIZE);
+        emit PTOX->friendRequestRecived(temp.toStdString(), QString::fromLocal8Bit((char*)message, length));
     }
 }
 
 void pTox::callback_friend_name(Tox *tox, uint32_t friend_number, const uint8_t *name, size_t length, void *user_data)
 {
     std::cout << "Friend " << PTOX->friendName(friend_number) << " changed name!" << std::endl;
+    if (PTOX) {
+        PTOX->updateToxFriendlList();
+        emit PTOX->appendText(QString("Friend <b>%1</b>changed name for: %2!").arg(QString::fromStdString(PTOX->friendName(friend_number))).arg(QString::fromLocal8Bit((char*)name, length)));
+    }
 }
 
 void pTox::callback_friend_status_message(Tox *tox, uint32_t friend_number, const uint8_t *message, size_t length, void *user_data)
 {
     std::cout << "Friend " << PTOX->friendName(friend_number) << " changed status for: " << message << std::endl;
+    if (PTOX) {
+        PTOX->updateToxFriendlList();
+        emit PTOX->appendText(QString("Friend <b>%1</b>changed name for: %2!").arg(QString::fromStdString(PTOX->friendName(friend_number))).arg(QString::fromLocal8Bit((char*)message, length)));
+    }
 }
 
 void pTox::callback_friend_status(Tox *tox, uint32_t friend_number, TOX_USER_STATUS status, void *user_data)
 {
     std::cout << "Friend " << PTOX->friendName(friend_number) << " changed status for: " << PTOX->Status2String((STATUS) status) << std::endl;
+    if (PTOX) {
+        PTOX->updateToxFriendlList();
+        emit PTOX->appendText(QString("Friend <b>%1</b>changed name for: %2!").arg(QString::fromStdString(PTOX->friendName(friend_number))).arg(QString::fromStdString(PTOX->Status2String((STATUS) status))));
+    }
 }
 
 void pTox::callback_file_recv(Tox *tox, uint32_t friend_number, uint32_t file_number, uint32_t kind, uint64_t file_size, const uint8_t *filename, size_t filename_length, void *user_data)
@@ -619,8 +641,12 @@ void pTox::callback_file_recv(Tox *tox, uint32_t friend_number, uint32_t file_nu
 
     tox_file_control(tox, friend_number, file_number, TOX_FILE_CONTROL_CANCEL, NULL);
 
-    const char *MSG = "Sorry, I don't support file transfers.";
+    const char *MSG = "Sorry, I don't support file transfers, YET!";
     tox_friend_send_message(tox, friend_number, TOX_MESSAGE_TYPE_NORMAL, (uint8_t*)MSG, strlen(MSG), NULL);
+
+    if (PTOX) {
+        emit PTOX->appendText(QString("Friend: <b>%1</b> wanted to send file!").arg(QString::fromStdString(PTOX->friendName(friend_number))));
+    }
 }
 
 void pTox::callback_call(ToxAV *av, uint32_t friend_number, bool audio_enabled, bool video_enabled, void *user_data)

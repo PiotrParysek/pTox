@@ -43,6 +43,7 @@ signals:
     void sendMessage(uint32_t, std::string);
 public slots:
     void sendMessage();
+
     void changeTable();
     void appendText(QString);
     void friendRequestRecived(std::string, QString);
@@ -66,6 +67,8 @@ private slots:
     void on_actionelp_triggered();
 
     void on_actionEXIT_triggered();
+
+    void on_pushButton_clicked();
 
 private:
     bool fileExists(QString);

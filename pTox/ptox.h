@@ -59,7 +59,6 @@ public:
 signals:
     void changeTable();
     void appendText(QString);
-    void friendChange(uint32_t);
     void friendRequestRecived(std::string, QString);
 
 public slots:
@@ -68,9 +67,9 @@ public slots:
     void setStatus(std::string StatusMsg);
 
     void addFriend(uint32_t);
-    void sendRequest(std::string Address, std::string Message);
     void removeFriend(uint32_t);
     void clearFriendVector();
+    void sendRequest(std::string Address, std::string Message);
 
     void sendMessage(std::string);
     void sendMessage(uint32_t, std::string);

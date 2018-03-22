@@ -29,22 +29,18 @@ MainWindow::MainWindow(QWidget *parent) :
     QObject::connect(PTOX, SIGNAL(changeTable()), this, SLOT(changeTable())); //Change table if something changes
     QObject::connect(PTOX, SIGNAL(friendRequestRecived(std::string,QString)), this, SLOT(friendRequestRecived(std::string,QString)));
     QObject::connect(PTOX, SIGNAL(appendText(QString)), this, SLOT(appendText(QString))); //Add notification
-    QObject::connect(PTOX, SIGNAL(friendRequestRecived(std::string,QString)), this, SLOT(friendRequestRecived(std::string,QString)));//
 
     QObject::connect(this, SIGNAL(setName(std::string)), PTOX, SLOT(setName(std::string)));
     QObject::connect(this, SIGNAL(setStatus(pTox::STATUS)), PTOX, SLOT(setStatus(pTox::STATUS)));
     QObject::connect(this, SIGNAL(setStatus(std::string)), PTOX, SLOT(setStatus(std::string)));
-    QObject::connect(this, SIGNAL(friendRequest(std::string,friendRequestRecived)), PTOX, SLOT(sendRequest(std::string,std::string)));
+    QObject::connect(this, SIGNAL(friendRequest(std::string, std::string)), PTOX, SLOT(sendRequest(std::string,std::string)));
     QObject::connect(this, SIGNAL(addFriend(uint32_t)), PTOX, SLOT(addFriend(uint32_t)));
     QObject::connect(this, SIGNAL(removeFriend(uint32_t)), PTOX, SLOT(removeFriend(uint32_t)));
     QObject::connect(this, SIGNAL(sendMessage(std::string)), PTOX, SLOT(sendMessage(std::string)));
     QObject::connect(this, SIGNAL(sendMessage(uint32_t,std::string)), PTOX, SLOT(sendMessage(uint32_t,std::string)));
     QObject::connect(this, SIGNAL(clearFriendVector()), PTOX, SLOT(clearFriendVector()));
 
-
-//    QObject::connect(, SIGNAL(), , SLOT());
-//    QObject::connect(PTOX, SIGNAL(), this, SLOT());
-//    QObject::connect(this, SIGNAL(), PTOX, SLOT());
+    changeTable();
 }
 
 MainWindow::~MainWindow()
@@ -222,7 +218,23 @@ void MainWindow::on_actionAdd_new_triggered()
 
 void MainWindow::on_actionRemove_triggered()
 {
-    //In dialog display all the contacts in combobox if Ok then  emit
+    QStringList items;
+    for (int i = 0; i < this->ui->tableWidget->rowCount(); ++i) {
+        QString text;
+        text += this->ui->tableWidget->item(i, 0)->text();
+        text += "-";
+        text += this->ui->tableWidget->item(i, 1)->text();
+
+        items << text;
+    }
+
+    bool ok;
+    QString item = QInputDialog::getItem(this, "Friend to remove", "Choose friend to remove: ", items, 0, false, &ok);
+    if (ok && !item.isEmpty()) {
+        QStringList list2 = item.split('-', QString::SkipEmptyParts);
+        QString val = list2.at(1);
+        emit removeFriend(val.toUInt());
+    }
 }
 
 void MainWindow::on_actionVersion_triggered()
@@ -245,4 +257,9 @@ void MainWindow::on_actionEXIT_triggered()
     delete PTOX;
 
     this->close();
+}
+
+void MainWindow::on_pushButton_clicked()
+{
+    sendMessage();
 }
