@@ -52,6 +52,7 @@ MainWindow::~MainWindow()
 void MainWindow::sendMessage()
 {
     std::string TEXT = this->ui->textEdit->toPlainText().toStdString();
+    TEXT.erase(std::remove(TEXT.begin(), TEXT.end(), '\n'), TEXT.end());
     if (!TEXT.empty()) {
         if (this->ui->comboBox->currentIndex() == 0) {
             emit sendMessage(TEXT);
@@ -81,7 +82,7 @@ void MainWindow::changeTable()
     for (size_t i = 0; i < FriendSize; ++i) {
         pTox::toxFriend f = PTOX->friendVectorData(i);
         QTableWidgetItem *itemName = new QTableWidgetItem(QString::fromStdString(f.friendName));
-        QTableWidgetItem *itemID = new QTableWidgetItem(QString("%d").arg(f.friendNumber));
+        QTableWidgetItem *itemID = new QTableWidgetItem(QString("%1").arg(f.friendNumber, 0, 10));
         switch (f.friendConnectionStatus) {
         case pTox::AVAILABLE:
             itemName->setBackground(Qt::green);
@@ -96,6 +97,8 @@ void MainWindow::changeTable()
             itemID->setBackground(Qt::red);
             break;
         }
+        itemName->setFlags(itemName->flags() & ~Qt::ItemIsEditable);
+        itemID->setFlags(itemID->flags() & ~Qt::ItemIsEditable);
         this->ui->tableWidget->setItem(i, 0, itemName);
         this->ui->tableWidget->setItem(i, 1, itemID);
         this->ui->comboBox->addItem(QString::fromStdString(f.friendName));
@@ -108,9 +111,9 @@ void MainWindow::appendText(QString text)
     this->ui->textBrowser->append(text);
 }
 
-void MainWindow::friendRequestRecived(std::string, QString)
+void MainWindow::friendRequestRecived(std::string public_key, QString message)
 {
-
+    emit friendRequest(std::string, std::string);
 }
 
 void MainWindow::keyReleaseEvent(QKeyEvent *event)

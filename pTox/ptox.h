@@ -9,7 +9,10 @@
 #include <iostream>
 #include <sstream>
 #include <string>
+#include <chrono>
+#include <thread>
 
+#include <SFML/Audio.hpp>
 
 #include "definitions.h"
 
@@ -23,6 +26,7 @@ public:
         BUSY
     } STATUS;
     Q_ENUM(STATUS)
+
     struct toxFriend {
         std::string friendName;
         uint32_t friendNumber;
@@ -38,13 +42,14 @@ private:
     std::string FilePath;
     int framesize;
 
+    pthread_t tox_thread, toxav_thread;
+
     uint8_t AddressBin[TOX_ADDRESS_SIZE];
     uint8_t AddressHex[TOX_ADDRESS_SIZE*2+1];
     std::string Name;
     std::string StatusMessage;
     STATUS Status;
     std::vector<toxFriend> friendVector;
-
 public:
     pTox() {}
     pTox(bool newAccount, std::string FilePath);
@@ -60,6 +65,7 @@ signals:
     void changeTable();
     void appendText(QString);
     void friendRequestRecived(std::string, QString);
+    void newAudioMessage();
 
 public slots:
     void setName(std::string Name);
@@ -88,6 +94,8 @@ protected:
     void Connect();
     void updateToxFriendlList();
 
+    static void *runToxThread(void *arg);
+    static void *runToxAVThread(void *arg);
 private:
     /*--- CALLBACKS ---*/
     /**
@@ -129,6 +137,13 @@ private:
     */
     static void callback_friend_status(Tox *tox, uint32_t friend_number, TOX_USER_STATUS status, void *user_data);
     /**
+    * The function type for the call callback.
+    * @param friend_number The friend number from which the call is incoming.
+    * @param audio_enabled True if friend is sending audio.
+    * @param video_enabled True if friend is sending video.
+    */
+    static void callback_call(ToxAV *av, uint32_t friend_number, bool audio_enabled, bool video_enabled, void *user_data);
+    /**
     * The client should acquire resources to be associated with the file transfer.
     * Incoming file transfers start in the PAUSED state. After this callback
     * returns, a transfer can be rejected by sending a TOX_FILE_CONTROL_CANCEL
@@ -142,32 +157,29 @@ private:
     * @param filename_length Size in bytes of the filename.
     */
     static void callback_file_recv(Tox *tox, uint32_t friend_number, uint32_t file_number, uint32_t kind, uint64_t file_size, const uint8_t *filename, size_t filename_length, void *user_data);
-    /**
-    * The function type for the call callback.
-    * @param friend_number The friend number from which the call is incoming.
-    * @param audio_enabled True if friend is sending audio.
-    * @param video_enabled True if friend is sending video.
-    */
-    static void callback_call(ToxAV *av, uint32_t friend_number, bool audio_enabled, bool video_enabled, void *user_data);
-    /**
-    * The function type for the call_state callback.
-    * @param friend_number The friend number for which the call state changed.
-    * @param state The bitmask of the new call state which is guaranteed to be
-    * different than the previous state. The state is set to 0 when the call is
-    * paused. The bitmask represents all the activities currently performed by the friend.
-    */
-    static void callback_call_state(ToxAV *av, uint32_t friend_number, uint32_t state, void *user_data);
-    /**
-    * The function type for the audio_receive_frame callback. The callback can be
-    * called multiple times per single iteration depending on the amount of queued
-    * frames in the buffer. The received format is the same as in send function.
-    * @param friend_number The friend number of the friend who sent an audio frame.
-    * @param pcm An array of audio samples (sample_count * channels elements).
-    * @param sample_count The number of audio samples per channel in the PCM array.
-    * @param channels Number of audio channels.
-    * @param sampling_rate Sampling rate used in this frame.
-    */
-    static void callback_audio_receive_frame(ToxAV *av, uint32_t friend_number, const int16_t *pcm, size_t sample_count, uint8_t channels, uint32_t sampling_rate, void *user_data);
+//    /**
+//    * @param friend_number The friend number of the receiving friend for this file.
+//    * @param file_number The file transfer identifier returned by tox_file_send.
+//    * @param position The file or stream position from which to continue reading.
+//    * @param length The number of bytes requested for the current chunk.
+//    */
+//    static void callback_file_chunk_request(Tox *tox, uint32_t friend_number, uint32_t file_number, uint64_t position, size_t length, void *user_data);
+//    /**
+//    * @param friend_number The friend number of the friend who is sending the file.
+//    * @param file_number The friend-specific file number the data received is
+//    *   associated with.
+//    * @param control The file control command received.
+//    */
+//    static void callback_file_recv_control(Tox *tox, uint32_t friend_number, uint32_t file_number, TOX_FILE_CONTROL control, void *user_data);
+//    /**
+//    * @param friend_number The friend number of the friend who is sending the file.
+//    * @param file_number The friend-specific file number the data received is associated with.
+//    * @param position The file position of the first byte in data.
+//    * @param data A byte array containing the received chunk.
+//    * @param length The length of the received chunk.
+//     */
+//    static void callback_file_recv_chunk(Tox *tox, uint32_t friend_number, uint32_t file_number, uint64_t position, const uint8_t *data, size_t length, void *user_data);
+
     /*--- ERRORS ---*/
     std::string tox_set_info_error(TOX_ERR_SET_INFO error);
     std::string tox_add_friend_error(TOX_ERR_FRIEND_ADD error);

@@ -52,6 +52,13 @@
             <widget class="QComboBox" name="comboBox"/>
            </item>
            <item>
+            <widget class="QPushButton" name="pushButton_audio">
+             <property name="text">
+              <string>PushButton</string>
+             </property>
+            </widget>
+           </item>
+           <item>
             <widget class="QTextEdit" name="textEdit">
              <property name="maximumSize">
               <size>

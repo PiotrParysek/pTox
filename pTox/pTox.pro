@@ -28,6 +28,8 @@ unix {
     PKGCONFIG += libsodium toxcore openal
 }
 
+LIBS += -lsfml-audio -lsfml-graphics -lsfml-system -lsfml-network -lsfml-window
+
 SOURCES += \
         main.cpp \
         mainwindow.cpp \

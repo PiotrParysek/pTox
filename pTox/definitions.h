@@ -14,7 +14,7 @@
 #define AUDIOCHANNELS     1
 #define AUDIOBITRATE      32
 #define AUDIOFRAME        20
-#define AUDIOSAMPLERATE   48000
+#define AUDIOSAMPLERATE   24000
 
 #define LEN(x) (sizeof (x) / sizeof *(x))
 

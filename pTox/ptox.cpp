@@ -19,11 +19,9 @@ pTox::pTox(bool newAccount, std::string FilePath)
     tox_callback_friend_request(tox, callback_friend_request);
     tox_callback_friend_message(tox, callback_friend_message);
     tox_callback_file_recv(tox, callback_file_recv);
-
-    TOXAV_ERR_NEW errorav;
-    toxav = toxav_new(tox, &errorav);
-    if (errorav != TOXAV_ERR_NEW_OK)
-        std::cerr << "ToxAV Init fail!: " << errorav << std::endl;
+//    tox_callback_file_chunk_request(tox, callback_file_chunk_request);
+//    tox_callback_file_recv_control(tox, callback_file_recv_control);
+//    tox_callback_file_recv_chunk(tox, callback_file_recv_chunk);
 
     framesize = (AUDIOSAMPLERATE * AUDIOFRAME * AUDIOCHANNELS) / 1000;
 
@@ -36,8 +34,17 @@ pTox::pTox(bool newAccount, std::string FilePath)
     Connect();
 
     //ToxAV
+    TOXAV_ERR_NEW errorav;
+    toxav = toxav_new(tox, &errorav);
+    if (errorav != TOXAV_ERR_NEW_OK) {
+        std::cerr << "ToxAV Init fail!: " << errorav << std::endl;
+        return;
+    }
+    toxav_callback_call(toxav, callback_call, NULL);
 
     //threads
+    pthread_create(&tox_thread, NULL, &runToxThread, tox);
+    pthread_create(&toxav_thread, NULL, &runToxAVThread, toxav);
 
     PTOX = this;
 
@@ -46,10 +53,15 @@ pTox::pTox(bool newAccount, std::string FilePath)
 
 pTox::~pTox()
 {
+    pthread_cancel(tox_thread);
+    pthread_cancel(toxav_thread);
+
     SaveProfile();
 
     this->friendVector.clear();
 
+
+    toxav_kill(toxav);
     tox_kill(tox);
 
     std::cout << "GOODBYE WORLD" << std::endl;
@@ -564,6 +576,28 @@ void pTox::updateToxFriendlList()
     emit changeTable();
 }
 
+void *pTox::runToxThread(void *arg)
+{
+    Tox *t_tox = (Tox*)arg;
+    while (true) {
+        tox_iterate(t_tox, NULL);
+
+        uint32_t time = tox_iteration_interval(t_tox);
+        std::this_thread::sleep_for(std::chrono::milliseconds(time));
+    }
+}
+
+void *pTox::runToxAVThread(void *arg)
+{
+    ToxAV *t_toxav = (ToxAV*)arg;
+    while (true) {
+        toxav_iterate(t_toxav);
+
+        uint32_t time = toxav_iteration_interval(t_toxav);
+        std::this_thread::sleep_for(std::chrono::milliseconds(time));
+    }
+}
+
 void pTox::callback_self_connection_status(Tox *tox, TOX_CONNECTION status, void *userData)
 {
     std::cout << "Connection status: " << status << std::endl;
@@ -651,17 +685,11 @@ void pTox::callback_file_recv(Tox *tox, uint32_t friend_number, uint32_t file_nu
 
 void pTox::callback_call(ToxAV *av, uint32_t friend_number, bool audio_enabled, bool video_enabled, void *user_data)
 {
-
-}
-
-void pTox::callback_call_state(ToxAV *av, uint32_t friend_number, uint32_t state, void *user_data)
-{
-
-}
-
-void pTox::callback_audio_receive_frame(ToxAV *av, uint32_t friend_number, const int16_t *pcm, size_t sample_count, uint8_t channels, uint32_t sampling_rate, void *user_data)
-{
-
+    TOXAV_ERR_CALL_CONTROL error;
+    if (!toxav_call_control(av, friend_number, TOXAV_CALL_CONTROL_CANCEL, &error)) {
+        std::cerr << "Failed to reject call! error: " << error << std::endl;
+        return;
+    }
 }
 
 std::string pTox::tox_set_info_error(TOX_ERR_SET_INFO error)
