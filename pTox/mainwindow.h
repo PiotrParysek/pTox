@@ -14,7 +14,9 @@
 #include <QFileInfo>
 #include <QFile>
 
+
 #include "ptox.h"
+#include "audiocall.h"
 
 namespace Ui {
 class MainWindow;
@@ -26,8 +28,19 @@ class MainWindow : public QMainWindow
 private:
     pTox *PTOX;
     std::string FilePath;
+
+    AudioCall *call = NULL;
+    bool isCall = false;
+    uint32_t callFriendNumber;
 public:
+    /**
+     * @brief MainWindow Main constructor of GUI and connection between classes
+     * @param parent
+     */
     explicit MainWindow(QWidget *parent = 0);
+    /**
+     * Destructor
+     */
     ~MainWindow();
 signals:
     void setName(std::string Name);
@@ -41,14 +54,18 @@ signals:
 
     void sendMessage(std::string);
     void sendMessage(uint32_t, std::string);
+
+    void sendAudioFrame(uint32_t friend_number, const int16_t *pcm, size_t sample_count, uint8_t channels, uint32_t sampling_rate);
 public slots:
     void sendMessage();
+    void sendMessage(uint32_t, QString);
 
     void changeTable();
     void appendText(QString);
     void friendRequestRecived(std::string, QString);
-protected:
-    void keyReleaseEvent(QKeyEvent *event);
+
+    void reviveAudioframe(uint32_t friend_number, const int16_t *pcm, size_t sample_count, uint8_t channels, uint32_t sampling_rate);
+    void closeCall();
 private slots:
     void on_actionSet_name_triggered();
 
@@ -70,7 +87,12 @@ private slots:
 
     void on_pushButton_clicked();
 
-private:
+    void on_actionSend_message_triggered();
+
+    void on_pushButton_audio_clicked();
+
+protected:
+    void keyReleaseEvent(QKeyEvent *event);
     bool fileExists(QString);
 private:
     Ui::MainWindow *ui;

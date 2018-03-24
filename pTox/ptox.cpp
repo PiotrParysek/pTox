@@ -307,6 +307,28 @@ void pTox::sendMessage(uint32_t friendNumber, std::string msg)
     }
 }
 
+void pTox::audioCall(uint32_t friend_number, bool decision)
+{
+    TOXAV_ERR_ANSWER error;
+    if (decision) {
+        toxav_answer(toxav, friend_number, AUDIOBITRATE, 0, &error);
+    } else {
+        toxav_answer(toxav, friend_number, 0, 0, &error);
+    }
+    if (error != TOXAV_ERR_ANSWER_OK)
+        std::cerr << "ERROR Toxav answer: " << toxav_answer_error(error) << std::endl;
+}
+
+void pTox::sendAudioFrame(uint32_t friend_number, const int16_t *pcm, size_t sample_count, uint8_t channels, uint32_t sampling_rate)
+{
+    TOXAV_ERR_SEND_FRAME error;
+    toxav_audio_send_frame(toxav, friend_number, pcm, sample_count, channels, sampling_rate, &error);
+
+    if (error != TOXAV_ERR_SEND_FRAME_OK) {
+        std::cerr << "ERROR: send audio frame to: " << friendName(friend_number) << " error: " << toxav_send_frame_error(error) << std::endl;
+    }
+}
+
 std::string pTox::uint82string(uint8_t *tab, size_t lenght)
 {
     std::string s;
@@ -603,68 +625,86 @@ void pTox::callback_self_connection_status(Tox *tox, TOX_CONNECTION status, void
     std::cout << "Connection status: " << status << std::endl;
     if (status == TOX_CONNECTION_NONE) {
         std::cerr << "Error with the connection!" << std::endl;
-        if (PTOX) {
-            emit PTOX->appendText("<font color=\"red\">ERROR with the connection!</font><br />");
-        }
+        emit PTOX->appendText("<font color=\"red\">ERROR with the connection!</font><br />");
     } else {
         std::cout << "Connected to TOX, status: " << status << std::endl;
-        if (PTOX) {
-            emit PTOX->appendText("<font color=\"green\">Sucessfully connected to TOX!</font><br />");
-        }
+        emit PTOX->appendText("<font color=\"green\">Sucessfully connected to TOX!</font><br />");
     }
 }
 
 void pTox::callback_friend_connection_status(Tox *tox, uint32_t friend_number, TOX_CONNECTION connection_status, void *user_data)
 {
     std::cout << "Friend connection status changed: " << PTOX->friendName(friend_number) << " to: " << PTOX->Connection2String(connection_status) << std::endl;
-    if (PTOX) {
-        PTOX->updateToxFriendlList();
-        emit PTOX->appendText(QString("Friend <b>%1</b>changed connection status for: %2!").arg(QString::fromStdString(PTOX->friendName(friend_number))).arg(QString::fromStdString(PTOX->Connection2String(connection_status))));
-    }
+    PTOX->updateToxFriendlList();
+    emit PTOX->appendText(QString("Friend <b>%1</b>changed connection status for: %2!").arg(QString::fromStdString(PTOX->friendName(friend_number))).arg(QString::fromStdString(PTOX->Connection2String(connection_status))));
 }
 
 void pTox::callback_friend_message(Tox *tox, uint32_t friend_number, TOX_MESSAGE_TYPE type, const uint8_t *message, size_t length, void *user_data)
 {
     std::cout << "Friend " << PTOX->friendName(friend_number) << " messaged: " << message << std::endl;
-    if (PTOX) {
-        emit PTOX->appendText(QString("Friend: <b>%1</b> wrote: %2").arg(QString::fromStdString(PTOX->friendName(friend_number))).arg(QString::fromLocal8Bit((char*)message, length)));
-    }
+    emit PTOX->appendText(QString("Friend: <b>%1</b> wrote: %2").arg(QString::fromStdString(PTOX->friendName(friend_number))).arg(QString::fromLocal8Bit((char*)message, length)));
 }
 
 void pTox::callback_friend_request(Tox *tox, const uint8_t *public_key, const uint8_t *message, size_t length, void *user_data)
 {
     std::cout << "Maybe new friend send request: " << message << std::endl;;
-    if (PTOX) {
-        QString temp = QString::fromLocal8Bit((char*)public_key, TOX_PUBLIC_KEY_SIZE);
-        emit PTOX->friendRequestRecived(temp.toStdString(), QString::fromLocal8Bit((char*)message, length));
-    }
+    QString temp = QString::fromLocal8Bit((char*)public_key, TOX_PUBLIC_KEY_SIZE);
+    emit PTOX->friendRequestRecived(temp.toStdString(), QString::fromLocal8Bit((char*)message, length));
 }
 
 void pTox::callback_friend_name(Tox *tox, uint32_t friend_number, const uint8_t *name, size_t length, void *user_data)
 {
     std::cout << "Friend " << PTOX->friendName(friend_number) << " changed name!" << std::endl;
-    if (PTOX) {
-        PTOX->updateToxFriendlList();
-        emit PTOX->appendText(QString("Friend <b>%1</b>changed name for: %2!").arg(QString::fromStdString(PTOX->friendName(friend_number))).arg(QString::fromLocal8Bit((char*)name, length)));
-    }
+    PTOX->updateToxFriendlList();
+    emit PTOX->appendText(QString("Friend <b>%1</b>changed name for: %2!").arg(QString::fromStdString(PTOX->friendName(friend_number))).arg(QString::fromLocal8Bit((char*)name, length)));
 }
 
 void pTox::callback_friend_status_message(Tox *tox, uint32_t friend_number, const uint8_t *message, size_t length, void *user_data)
 {
     std::cout << "Friend " << PTOX->friendName(friend_number) << " changed status for: " << message << std::endl;
-    if (PTOX) {
-        PTOX->updateToxFriendlList();
-        emit PTOX->appendText(QString("Friend <b>%1</b>changed name for: %2!").arg(QString::fromStdString(PTOX->friendName(friend_number))).arg(QString::fromLocal8Bit((char*)message, length)));
-    }
+    PTOX->updateToxFriendlList();
+    emit PTOX->appendText(QString("Friend <b>%1</b>changed status for: %2!").arg(QString::fromStdString(PTOX->friendName(friend_number))).arg(QString::fromLocal8Bit((char*)message, length)));
 }
 
 void pTox::callback_friend_status(Tox *tox, uint32_t friend_number, TOX_USER_STATUS status, void *user_data)
 {
     std::cout << "Friend " << PTOX->friendName(friend_number) << " changed status for: " << PTOX->Status2String((STATUS) status) << std::endl;
-    if (PTOX) {
-        PTOX->updateToxFriendlList();
-        emit PTOX->appendText(QString("Friend <b>%1</b>changed name for: %2!").arg(QString::fromStdString(PTOX->friendName(friend_number))).arg(QString::fromStdString(PTOX->Status2String((STATUS) status))));
+    PTOX->updateToxFriendlList();
+    emit PTOX->appendText(QString("Friend <b>%1</b>changed status for: %2!").arg(QString::fromStdString(PTOX->friendName(friend_number))).arg(QString::fromStdString(PTOX->Status2String((STATUS) status))));
+}
+
+void pTox::callback_call(ToxAV *av, uint32_t friend_number, bool audio_enabled, bool video_enabled, void *user_data)
+{
+    //Sb is inviting for a call
+    if (!audio_enabled) {
+        TOXAV_ERR_CALL_CONTROL error;
+        if (!toxav_call_control(av, friend_number, TOXAV_CALL_CONTROL_CANCEL, &error)) {
+            std::cerr << "Failed to reject call! error: " << PTOX->toxav_call_error(error) << " from: " << PTOX->friendName(friend_number) << std::endl;
+            return;
+        } else if (video_enabled) {
+            std::cout << "Friend: " << PTOX->friendName(friend_number) << " wants to connect via video - rejected!" << std::endl;
+            return;
+        }
     }
+    emit PTOX->newAudioCall(friend_number);
+}
+
+void pTox::callback_call_state(ToxAV *av, uint32_t friend_number, uint32_t state, void *user_data)
+{
+    //Change for call status
+    toxFriend f = PTOX->friendVectorData(friend_number);
+    if (state & TOXAV_FRIEND_CALL_STATE_FINISHED) {
+        std::cout << "Call with friend: " << PTOX->friendName(friend_number) << " Finished!" << std::endl;
+        emit PTOX->endAudioCall(friend_number);
+    } else if (state & TOXAV_FRIEND_CALL_STATE_ERROR) {
+        std::cout << "Call with friend: " << PTOX->friendName(friend_number) << " was ended - error happend!" << std::endl;
+        emit PTOX->endAudioCall(friend_number);
+    }
+}
+
+void pTox::callback_audio_receive_frame(ToxAV *av, uint32_t friend_number, const int16_t *pcm, size_t sample_count, uint8_t channels, uint32_t sampling_rate, void *user_data)
+{
+    emit PTOX->revivedAudioFrame(friend_number, pcm, sample_count, channels, sampling_rate);
 }
 
 void pTox::callback_file_recv(Tox *tox, uint32_t friend_number, uint32_t file_number, uint32_t kind, uint64_t file_size, const uint8_t *filename, size_t filename_length, void *user_data)
@@ -683,14 +723,20 @@ void pTox::callback_file_recv(Tox *tox, uint32_t friend_number, uint32_t file_nu
     }
 }
 
-void pTox::callback_call(ToxAV *av, uint32_t friend_number, bool audio_enabled, bool video_enabled, void *user_data)
-{
-    TOXAV_ERR_CALL_CONTROL error;
-    if (!toxav_call_control(av, friend_number, TOXAV_CALL_CONTROL_CANCEL, &error)) {
-        std::cerr << "Failed to reject call! error: " << error << std::endl;
-        return;
-    }
-}
+//void pTox::callback_file_chunk_request(Tox *tox, uint32_t friend_number, uint32_t file_number, uint64_t position, size_t length, void *user_data)
+//{
+
+//}
+
+//void pTox::callback_file_recv_control(Tox *tox, uint32_t friend_number, uint32_t file_number, TOX_FILE_CONTROL control, void *user_data)
+//{
+
+//}
+
+//void pTox::callback_file_recv_chunk(Tox *tox, uint32_t friend_number, uint32_t file_number, uint64_t position, const uint8_t *data, size_t length, void *user_data)
+//{
+
+//}
 
 std::string pTox::tox_set_info_error(TOX_ERR_SET_INFO error)
 {
@@ -781,5 +827,61 @@ std::string pTox::toxav_new_error(TOXAV_ERR_NEW error)
         return "Attempted to create a second session for the same Tox instance.";
     default:
         return "Unknown error";
+    }
+}
+
+std::string pTox::toxav_call_error(TOXAV_ERR_CALL_CONTROL error)
+{
+    switch (error) {
+    case TOXAV_ERR_CALL_CONTROL_OK:
+        return "The function returned successfully.";
+    case TOXAV_ERR_CALL_CONTROL_SYNC:
+        return "Synchronization error occurred.";
+    case TOXAV_ERR_CALL_CONTROL_FRIEND_NOT_FOUND:
+        return "The friend_number passed did not designate a valid friend.";
+    case TOXAV_ERR_CALL_CONTROL_FRIEND_NOT_IN_CALL:
+        return "This client is currently not in a call with the friend. Before the call is answered, only CANCEL is a valid control.";
+    case TOXAV_ERR_CALL_CONTROL_INVALID_TRANSITION:
+        return "Happens if user tried to pause an already paused call or if trying to resume a call that is not paused.";
+    }
+}
+
+std::string pTox::toxav_answer_error(TOXAV_ERR_ANSWER error)
+{
+    switch (error) {
+    case TOXAV_ERR_ANSWER_OK:
+        return "The function returned successfully.";
+    case TOXAV_ERR_ANSWER_SYNC:
+        return "Synchronization error occurred.";
+    case TOXAV_ERR_ANSWER_CODEC_INITIALIZATION:
+        return "Failed to initialize codecs for call session. Note that codec initiation will fail if there is no receive callback registered for either audio or video.";
+    case TOXAV_ERR_ANSWER_FRIEND_NOT_FOUND:
+        return "The friend number did not designate a valid friend.";
+    case TOXAV_ERR_ANSWER_FRIEND_NOT_CALLING:
+        return "The friend was valid, but they are not currently trying to initiate a call. This is also returned if this client is already in a call with the friend.";
+    case TOXAV_ERR_ANSWER_INVALID_BIT_RATE:
+        return "Audio or video bit rate is invalid.";
+    }
+}
+
+std::string pTox::toxav_send_frame_error(TOXAV_ERR_SEND_FRAME error)
+{
+    switch (error) {
+    case TOXAV_ERR_SEND_FRAME_OK:
+        return "The function returned successfully.";
+    case TOXAV_ERR_SEND_FRAME_NULL:
+        return "In case of video, one of Y, U, or V was NULL. In case of audio, the samples data pointer was NULL.";
+    case TOXAV_ERR_SEND_FRAME_FRIEND_NOT_FOUND:
+        return "The friend_number passed did not designate a valid friend.";
+    case TOXAV_ERR_SEND_FRAME_FRIEND_NOT_IN_CALL:
+        return "This client is currently not in a call with the friend.";
+    case TOXAV_ERR_SEND_FRAME_SYNC:
+        return "Synchronization error occurred.";
+    case TOXAV_ERR_SEND_FRAME_INVALID:
+        return "One of the frame parameters was invalid. E.g. the resolution may be too small or too large, or the audio sampling rate may be unsupported.";
+    case TOXAV_ERR_SEND_FRAME_PAYLOAD_TYPE_DISABLED:
+        return "Either friend turned off audio or video receiving or we turned off sending for the said payload.";
+    case TOXAV_ERR_SEND_FRAME_RTP_FAILED:
+        return "Failed to push frame through rtp interface.";
     }
 }

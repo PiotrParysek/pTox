@@ -66,6 +66,11 @@ void MainWindow::sendMessage()
     this->ui->textEdit->clear();
 }
 
+void MainWindow::sendMessage(uint32_t val, QString TEXT)
+{
+    emit sendMessage(val, TEXT.toStdString());
+}
+
 void MainWindow::changeTable()
 {
     this->ui->tableWidget->clear();
@@ -113,14 +118,20 @@ void MainWindow::appendText(QString text)
 
 void MainWindow::friendRequestRecived(std::string public_key, QString message)
 {
-    emit friendRequest(std::string, std::string);
+    emit friendRequest(public_key, message.toStdString());
 }
 
-void MainWindow::keyReleaseEvent(QKeyEvent *event)
+void MainWindow::reviveAudioframe(uint32_t friend_number, const int16_t *pcm, size_t sample_count, uint8_t channels, uint32_t sampling_rate)
 {
-    if ((event->key() == Qt::Key_Enter) || (event->key() == Qt::Key_Return)) {
-        sendMessage();
-    }
+    emit sendAudioFrame(friend_number, pcm, sample_count, channels, sampling_rate);
+}
+
+void MainWindow::closeCall()
+{
+    this->callFriendNumber = UINT32_MAX;
+    this->isCall = false;
+    while (call->isVisible()) { }
+    delete call;
 }
 
 bool MainWindow::fileExists(QString path)
@@ -190,7 +201,7 @@ void MainWindow::on_actionAdd_new_triggered()
     QVBoxLayout *vbox = new QVBoxLayout();
 
     QHBoxLayout *hbox1 = new QHBoxLayout();
-    QLineEdit *lineEdit1 = new QLineEdit("76518406F6A9F2217E8DC487CC783C25CC16A15EB36FF32E335A235342C48A39218F515C39A6"); //ADDRESS
+    QLineEdit *lineEdit1 = new QLineEdit("Address in HEX"); //ADDRESS
     hbox1->addWidget(new QLabel("ToxID: "));
     hbox1->addWidget(lineEdit1);
 
@@ -265,4 +276,50 @@ void MainWindow::on_actionEXIT_triggered()
 void MainWindow::on_pushButton_clicked()
 {
     sendMessage();
+}
+
+void MainWindow::on_actionSend_message_triggered()
+{
+    sendMessage();
+}
+
+void MainWindow::on_pushButton_audio_clicked()
+{
+    //bool one = !isCall;
+    bool two = this->ui->comboBox->currentIndex() == 0 ? true : false;
+    bool three = false;
+    if (!two) {
+        three = this->ui->tableWidget->item(this->ui->comboBox->currentIndex()+1, 1)->backgroundColor() != Qt::green ? true : false;
+    }
+    if (!isCall) {
+        QMessageBox::critical(this, "ERROR", "You have one call, currently it is impossible to make another call", QMessageBox::Ok);
+    } else if (!isCall || two) {
+        QMessageBox::critical(this, "ERROR", "You cannot caonnect to 'All' your friends!", QMessageBox::Ok);
+    } else if (!isCall || two || three) {
+        QMessageBox::critical(this, "ERROR", "You cannot caonnect to 'busy' or 'away' friend!", QMessageBox::Ok);
+    } else {
+        isCall = true;
+        size_t index = this->ui->comboBox->currentIndex()+1;
+        QString text = this->ui->tableWidget->item(index, 1)->text();
+        this->callFriendNumber = (uint32_t)text.toLongLong();
+
+        call = new AudioCall(this, this->callFriendNumber);
+
+
+        QObject::connect(call, SIGNAL(sendAudioFrame(uint32_t,const int16_t*,size_t,uint8_t,uint32_t)), this, SLOT(reviveAudioframe(uint32_t,const int16_t*,size_t,uint8_t,uint32_t)));
+        QObject::connect(this, SIGNAL(sendAudioFrame(uint32_t,const int16_t*,size_t,uint8_t,uint32_t)), PTOX, SLOT(reviveAudioframe(uint32_t,const int16_t*,size_t,uint8_t,uint32_t)));
+
+        QObject::connect(call, SIGNAL(sendMessage(uint32_t,QString)), this, SLOT(sendMessage(uint32_t,QString)));
+        QObject::connect(call, SIGNAL(closeConnection()), this, SLOT(closeCall()));
+        //QObject::connect(, SIGNAL(), , SLOT());
+
+        call->show();
+    }
+}
+
+void MainWindow::keyReleaseEvent(QKeyEvent *event)
+{
+    if ((event->key() == Qt::Key_Enter) || (event->key() == Qt::Key_Return)) {
+        sendMessage();
+    }
 }

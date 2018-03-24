@@ -30,15 +30,21 @@ unix {
 
 LIBS += -lsfml-audio -lsfml-graphics -lsfml-system -lsfml-network -lsfml-window
 
+#REMOVE THIS
+QMAKE_CXXFLAGS += -Wunused-parameter
+
 SOURCES += \
         main.cpp \
         mainwindow.cpp \
-    ptox.cpp
+    ptox.cpp \
+    audiocall.cpp
 
 HEADERS += \
         mainwindow.h \
     ptox.h \
-    definitions.h
+    definitions.h \
+    audiocall.h
 
 FORMS += \
-        mainwindow.ui
+        mainwindow.ui \
+    audiocall.ui
