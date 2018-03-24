@@ -65,8 +65,10 @@ signals:
     void changeTable();
     void appendText(QString);
     void friendRequestRecived(std::string, QString);
-    void newAudioMessage();
 
+    void newAudioCall(uint32_t);
+    void endAudioCall(uint32_t);
+    void revivedAudioFrame(uint32_t friend_number, const int16_t *pcm, size_t sample_count, uint8_t channels, uint32_t sampling_rate);
 public slots:
     void setName(std::string Name);
     void setStatus(pTox::STATUS status);
@@ -79,6 +81,9 @@ public slots:
 
     void sendMessage(std::string);
     void sendMessage(uint32_t, std::string);
+
+    void audioCall(uint32_t, bool);
+    void sendAudioFrame(uint32_t friend_number, const int16_t *pcm, size_t sample_count, uint8_t channels, uint32_t sampling_rate);
 
 protected:
     std::string uint82string(uint8_t *tab, size_t lenght);
@@ -144,6 +149,25 @@ private:
     */
     static void callback_call(ToxAV *av, uint32_t friend_number, bool audio_enabled, bool video_enabled, void *user_data);
     /**
+    * The function type for the call_state callback.
+    * @param friend_number The friend number for which the call state changed.
+    * @param state The bitmask of the new call state which is guaranteed to be
+    * different than the previous state. The state is set to 0 when the call is
+    * paused. The bitmask represents all the activities currently performed by the friend.
+    */
+    static void callback_call_state(ToxAV *av, uint32_t friend_number, uint32_t state, void *user_data);
+    /**
+    * The function type for the audio_receive_frame callback. The callback can be
+    * called multiple times per single iteration depending on the amount of queued
+    * frames in the buffer. The received format is the same as in send function.
+    * @param friend_number The friend number of the friend who sent an audio frame.
+    * @param pcm An array of audio samples (sample_count * channels elements).
+    * @param sample_count The number of audio samples per channel in the PCM array.
+    * @param channels Number of audio channels.
+    * @param sampling_rate Sampling rate used in this frame.
+    */
+    static void callback_audio_receive_frame(ToxAV *av, uint32_t friend_number, const int16_t *pcm, size_t sample_count, uint8_t channels, uint32_t sampling_rate, void *user_data);
+    /**
     * The client should acquire resources to be associated with the file transfer.
     * Incoming file transfers start in the PAUSED state. After this callback
     * returns, a transfer can be rejected by sending a TOX_FILE_CONTROL_CANCEL
@@ -186,6 +210,9 @@ private:
     std::string tox_friend_querry_error(TOX_ERR_FRIEND_QUERY error);
     std::string tox_send_message_error(TOX_ERR_FRIEND_SEND_MESSAGE error);
     std::string toxav_new_error(TOXAV_ERR_NEW error);
+    std::string toxav_call_error(TOXAV_ERR_CALL_CONTROL error);
+    std::string toxav_send_frame_error(TOXAV_ERR_SEND_FRAME error);
+    std::string toxav_answer_error(TOXAV_ERR_ANSWER error);
 };
 
 #endif // PTOX_H
