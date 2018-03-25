@@ -44,7 +44,7 @@ public:
     ~MainWindow();
 signals:
     void setName(std::string Name);
-    void setStatus(pTox::STATUS status);
+    void setStatus(TOX_USER_STATUS status);
     void setStatus(std::string StatusMsg);
 
     void addFriend(uint32_t);
@@ -55,6 +55,7 @@ signals:
     void sendMessage(std::string);
     void sendMessage(uint32_t, std::string);
 
+    void audioCall(uint32_t, bool);
     void sendAudioFrame(uint32_t friend_number, const int16_t *pcm, size_t sample_count, uint8_t channels, uint32_t sampling_rate);
 public slots:
     void sendMessage();
@@ -64,6 +65,8 @@ public slots:
     void appendText(QString);
     void friendRequestRecived(std::string, QString);
 
+    void newAudioCall(uint32_t);
+    void endAudioCall(uint32_t);
     void reviveAudioframe(uint32_t friend_number, const int16_t *pcm, size_t sample_count, uint8_t channels, uint32_t sampling_rate);
     void closeCall();
 private slots:
@@ -87,13 +90,17 @@ private slots:
 
     void on_pushButton_clicked();
 
-    void on_actionSend_message_triggered();
-
     void on_pushButton_audio_clicked();
 
+    void on_pushButton_Clear_clicked();
+
+    void on_pushButton_Update_clicked();
+
 protected:
+    void startCall(uint32_t FriendNumber);
     void keyReleaseEvent(QKeyEvent *event);
     bool fileExists(QString);
+    std::string Status2String(TOX_USER_STATUS);
 private:
     Ui::MainWindow *ui;
 };

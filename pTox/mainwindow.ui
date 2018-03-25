@@ -6,8 +6,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>713</width>
-    <height>341</height>
+    <width>710</width>
+    <height>480</height>
    </rect>
   </property>
   <property name="sizePolicy">
@@ -26,7 +26,7 @@
       <x>0</x>
       <y>0</y>
       <width>704</width>
-      <height>293</height>
+      <height>421</height>
      </rect>
     </property>
     <layout class="QHBoxLayout" name="horizontalLayout_2">
@@ -36,7 +36,14 @@
      <item>
       <layout class="QVBoxLayout" name="verticalLayout_2">
        <item>
-        <widget class="QTextBrowser" name="textBrowser"/>
+        <widget class="QTextBrowser" name="textBrowser">
+         <property name="minimumSize">
+          <size>
+           <width>0</width>
+           <height>250</height>
+          </size>
+         </property>
+        </widget>
        </item>
        <item>
         <layout class="QVBoxLayout" name="verticalLayout">
@@ -121,6 +128,20 @@
            </property>
           </widget>
          </item>
+         <item>
+          <widget class="QPushButton" name="pushButton_Clear">
+           <property name="text">
+            <string>Clear</string>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QPushButton" name="pushButton_Update">
+           <property name="text">
+            <string>Update</string>
+           </property>
+          </widget>
+         </item>
         </layout>
        </item>
       </layout>
@@ -133,7 +154,7 @@
     <rect>
      <x>0</x>
      <y>0</y>
-     <width>713</width>
+     <width>710</width>
      <height>22</height>
     </rect>
    </property>

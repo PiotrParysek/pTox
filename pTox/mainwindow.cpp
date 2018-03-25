@@ -26,19 +26,24 @@ MainWindow::MainWindow(QWidget *parent) :
     QShortcut *shortcut = new QShortcut(QKeySequence(Qt::Key_Enter), this->ui->textEdit); //If pressed Enter - Send message
     QObject::connect(shortcut, SIGNAL(activated()), this, SLOT(sendMessage()));
 
+    QObject::connect(PTOX, SIGNAL(appendText(QString)), this, SLOT(appendText(QString))); //Add notifications / messages
     QObject::connect(PTOX, SIGNAL(changeTable()), this, SLOT(changeTable())); //Change table if something changes
-    QObject::connect(PTOX, SIGNAL(friendRequestRecived(std::string,QString)), this, SLOT(friendRequestRecived(std::string,QString)));
-    QObject::connect(PTOX, SIGNAL(appendText(QString)), this, SLOT(appendText(QString))); //Add notification
 
     QObject::connect(this, SIGNAL(setName(std::string)), PTOX, SLOT(setName(std::string)));
-    QObject::connect(this, SIGNAL(setStatus(pTox::STATUS)), PTOX, SLOT(setStatus(pTox::STATUS)));
+    QObject::connect(this, SIGNAL(setStatus(TOX_USER_STATUS)), PTOX, SLOT(setStatus(TOX_USER_STATUS)));
     QObject::connect(this, SIGNAL(setStatus(std::string)), PTOX, SLOT(setStatus(std::string)));
+
+    QObject::connect(PTOX, SIGNAL(friendRequestRecived(std::string,QString)), this, SLOT(friendRequestRecived(std::string,QString)));//New friend request
     QObject::connect(this, SIGNAL(friendRequest(std::string, std::string)), PTOX, SLOT(sendRequest(std::string,std::string)));
     QObject::connect(this, SIGNAL(addFriend(uint32_t)), PTOX, SLOT(addFriend(uint32_t)));
     QObject::connect(this, SIGNAL(removeFriend(uint32_t)), PTOX, SLOT(removeFriend(uint32_t)));
+
     QObject::connect(this, SIGNAL(sendMessage(std::string)), PTOX, SLOT(sendMessage(std::string)));
     QObject::connect(this, SIGNAL(sendMessage(uint32_t,std::string)), PTOX, SLOT(sendMessage(uint32_t,std::string)));
     QObject::connect(this, SIGNAL(clearFriendVector()), PTOX, SLOT(clearFriendVector()));
+
+    QObject::connect(PTOX, SIGNAL(newAudioCall(uint32_t)), this, SLOT(newAudioCall(uint32_t)));
+    QObject::connect(PTOX, SIGNAL(endAudioCall(uint32_t)), this, SLOT(endAudioCall(uint32_t)));
 
     changeTable();
 }
@@ -51,13 +56,16 @@ MainWindow::~MainWindow()
 
 void MainWindow::sendMessage()
 {
-    std::string TEXT = this->ui->textEdit->toPlainText().toStdString();
-    TEXT.erase(std::remove(TEXT.begin(), TEXT.end(), '\n'), TEXT.end());
+    std::string TEXT;
+    try {
+        TEXT = this->ui->textEdit->toPlainText().toStdString();
+        TEXT.erase(std::remove(TEXT.begin(), TEXT.end(), '\n'), TEXT.end());
+    } catch (...) {}
     if (!TEXT.empty()) {
         if (this->ui->comboBox->currentIndex() == 0) {
             emit sendMessage(TEXT);
         } else {
-            size_t index = this->ui->comboBox->currentIndex()+1;
+            size_t index = this->ui->comboBox->currentIndex()-1;
             QString text = this->ui->tableWidget->item(index, 1)->text();
             uint32_t val = (uint32_t)text.toLongLong();
             emit sendMessage(val, TEXT);
@@ -75,10 +83,10 @@ void MainWindow::changeTable()
 {
     this->ui->tableWidget->clear();
     this->ui->comboBox->clear();
-    this->ui->tableWidget->setColumnCount(2);
+    this->ui->tableWidget->setColumnCount(3);
     size_t FriendSize = PTOX->friendVectorSize();
     this->ui->tableWidget->setRowCount(FriendSize);
-    this->ui->tableWidget->setHorizontalHeaderLabels(QStringList() << "Nick" << "ID");
+    this->ui->tableWidget->setHorizontalHeaderLabels(QStringList() << "Nick" << "ID" << "STATUS");
     this->ui->tableWidget->verticalHeader()->hide();
     this->ui->tableWidget->setShowGrid(false);
 
@@ -88,25 +96,24 @@ void MainWindow::changeTable()
         pTox::toxFriend f = PTOX->friendVectorData(i);
         QTableWidgetItem *itemName = new QTableWidgetItem(QString::fromStdString(f.friendName));
         QTableWidgetItem *itemID = new QTableWidgetItem(QString("%1").arg(f.friendNumber, 0, 10));
-        switch (f.friendConnectionStatus) {
-        case pTox::AVAILABLE:
-            itemName->setBackground(Qt::green);
-            itemID->setBackground(Qt::green);
-            break;
-        case pTox::AWAY:
-            itemName->setBackground(Qt::blue);
-            itemID->setBackground(Qt::blue);
-            break;
-        case pTox::BUSY:
-            itemName->setBackground(Qt::red);
-            itemID->setBackground(Qt::red);
-            break;
-        }
+        QTableWidgetItem *itemStatus = new QTableWidgetItem(QString("%1").arg(QString::fromStdString(Status2String(f.friendConnectionStatus))));
+
         itemName->setFlags(itemName->flags() & ~Qt::ItemIsEditable);
         itemID->setFlags(itemID->flags() & ~Qt::ItemIsEditable);
+        itemStatus->setFlags(itemStatus->flags() & ~Qt::ItemIsEditable);
+
+        itemName->setToolTip(QString::fromStdString(f.friendStatus));
+        itemID->setToolTip(QString::fromStdString(f.friendStatus));
+        itemStatus->setToolTip(QString::fromStdString(f.friendStatus));
+
         this->ui->tableWidget->setItem(i, 0, itemName);
         this->ui->tableWidget->setItem(i, 1, itemID);
+        this->ui->tableWidget->setItem(i, 2, itemStatus);
+
         this->ui->comboBox->addItem(QString::fromStdString(f.friendName));
+    }
+    for (int c = 0; c < this->ui->tableWidget->horizontalHeader()->count(); ++c) {
+        this->ui->tableWidget->horizontalHeader()->setSectionResizeMode(c, QHeaderView::Stretch);
     }
 }
 
@@ -118,7 +125,36 @@ void MainWindow::appendText(QString text)
 
 void MainWindow::friendRequestRecived(std::string public_key, QString message)
 {
-    emit friendRequest(public_key, message.toStdString());
+    int ret = QMessageBox::question(this, "New friend?", QString("You have recived new Freiend request with message: %1 Do you accept it?"), QMessageBox::Yes | QMessageBox::No, QMessageBox::Yes);
+    if (ret == QMessageBox::Yes) {
+        emit friendRequest(public_key, message.toStdString());
+    } else {
+        //Send nothing - we won't see his messages :D "Lack of knowlege is blessing"
+    }
+
+}
+
+void MainWindow::newAudioCall(uint32_t FriendNumber)
+{
+    if (isCall) { //There is a call - reject request!
+        emit audioCall(FriendNumber, false);
+    } else {
+        int ret = QMessageBox::question(this, "Incoming call", QString("Friend: %1 wants to connect with you, proceed?"), QMessageBox::Ok | QMessageBox::No, QMessageBox::Ok);
+        if (ret == QMessageBox::Ok) {
+            emit audioCall(FriendNumber, true);
+            startCall(FriendNumber);
+        } else {
+            emit audioCall(FriendNumber, false);
+        }
+    }
+}
+
+void MainWindow::endAudioCall(uint32_t FriendNumber)
+{
+    call->close();
+    this->appendText(QString("Friend <b>%1</b> ended call!<br />").arg(QString::fromStdString(PTOX->friendName(FriendNumber))));
+    isCall = false;
+    delete call;
 }
 
 void MainWindow::reviveAudioframe(uint32_t friend_number, const int16_t *pcm, size_t sample_count, uint8_t channels, uint32_t sampling_rate)
@@ -139,6 +175,20 @@ bool MainWindow::fileExists(QString path)
     QFileInfo check_file(path);
     // check if file exists and if yes: Is it really a file and no directory?
     return check_file.exists() && check_file.isFile();
+}
+
+std::string MainWindow::Status2String(TOX_USER_STATUS s)
+{
+    switch (s) {
+    case TOX_USER_STATUS_NONE:
+        return "AVAILABLE";
+    case TOX_USER_STATUS_AWAY:
+        return "AWAY";
+    case TOX_USER_STATUS_BUSY:
+        return "BUSY";
+    default:
+        return "unknown";
+    }
 }
 
 void MainWindow::on_actionSet_name_triggered()
@@ -184,7 +234,7 @@ void MainWindow::on_actionSet_status_triggered()
     dialog->setLayout(vbox);
 
     if (dialog->exec() == QDialog::Accepted) {
-        emit setStatus((pTox::STATUS)box->currentIndex());
+        emit setStatus((TOX_USER_STATUS)box->currentIndex());
         if (!lineEdit->text().isEmpty())
             emit setStatus(lineEdit->text().toStdString());
     }
@@ -198,6 +248,7 @@ void MainWindow::on_actionView_triggered()
 void MainWindow::on_actionAdd_new_triggered()
 {
     QDialog *dialog = new QDialog();
+    dialog->setMinimumSize(400,100);
     QVBoxLayout *vbox = new QVBoxLayout();
 
     QHBoxLayout *hbox1 = new QHBoxLayout();
@@ -278,18 +329,13 @@ void MainWindow::on_pushButton_clicked()
     sendMessage();
 }
 
-void MainWindow::on_actionSend_message_triggered()
-{
-    sendMessage();
-}
-
 void MainWindow::on_pushButton_audio_clicked()
 {
     //bool one = !isCall;
     bool two = this->ui->comboBox->currentIndex() == 0 ? true : false;
     bool three = false;
     if (!two) {
-        three = this->ui->tableWidget->item(this->ui->comboBox->currentIndex()+1, 1)->backgroundColor() != Qt::green ? true : false;
+        three = this->ui->tableWidget->item(this->ui->comboBox->currentIndex()-1, 2)->text() != "AVAILABLE" ? true : false;
     }
     if (!isCall) {
         QMessageBox::critical(this, "ERROR", "You have one call, currently it is impossible to make another call", QMessageBox::Ok);
@@ -298,23 +344,38 @@ void MainWindow::on_pushButton_audio_clicked()
     } else if (!isCall || two || three) {
         QMessageBox::critical(this, "ERROR", "You cannot caonnect to 'busy' or 'away' friend!", QMessageBox::Ok);
     } else {
-        isCall = true;
         size_t index = this->ui->comboBox->currentIndex()+1;
         QString text = this->ui->tableWidget->item(index, 1)->text();
-        this->callFriendNumber = (uint32_t)text.toLongLong();
-
-        call = new AudioCall(this, this->callFriendNumber);
-
-
-        QObject::connect(call, SIGNAL(sendAudioFrame(uint32_t,const int16_t*,size_t,uint8_t,uint32_t)), this, SLOT(reviveAudioframe(uint32_t,const int16_t*,size_t,uint8_t,uint32_t)));
-        QObject::connect(this, SIGNAL(sendAudioFrame(uint32_t,const int16_t*,size_t,uint8_t,uint32_t)), PTOX, SLOT(reviveAudioframe(uint32_t,const int16_t*,size_t,uint8_t,uint32_t)));
-
-        QObject::connect(call, SIGNAL(sendMessage(uint32_t,QString)), this, SLOT(sendMessage(uint32_t,QString)));
-        QObject::connect(call, SIGNAL(closeConnection()), this, SLOT(closeCall()));
-        //QObject::connect(, SIGNAL(), , SLOT());
-
-        call->show();
+        emit newAudioCall((uint32_t)text.toLongLong());
     }
+}
+
+void MainWindow::on_pushButton_Clear_clicked()
+{
+    this->ui->textBrowser->clear();
+}
+
+void MainWindow::on_pushButton_Update_clicked()
+{
+    this->PTOX->updateToxFriendlList();
+}
+
+void MainWindow::startCall(uint32_t FriendNumber)
+{
+    isCall = true;
+    this->callFriendNumber = FriendNumber;
+
+    call = new AudioCall(this, this->callFriendNumber);
+
+
+    QObject::connect(call, SIGNAL(sendAudioFrame(uint32_t,const int16_t*,size_t,uint8_t,uint32_t)), this, SLOT(reviveAudioframe(uint32_t,const int16_t*,size_t,uint8_t,uint32_t)));
+    QObject::connect(this, SIGNAL(sendAudioFrame(uint32_t,const int16_t*,size_t,uint8_t,uint32_t)), PTOX, SLOT(reviveAudioframe(uint32_t,const int16_t*,size_t,uint8_t,uint32_t)));
+
+    QObject::connect(call, SIGNAL(sendMessage(uint32_t,QString)), this, SLOT(sendMessage(uint32_t,QString)));
+    QObject::connect(call, SIGNAL(closeConnection()), this, SLOT(closeCall()));
+    //QObject::connect(, SIGNAL(), , SLOT());
+
+    call->show();
 }
 
 void MainWindow::keyReleaseEvent(QKeyEvent *event)
@@ -323,3 +384,4 @@ void MainWindow::keyReleaseEvent(QKeyEvent *event)
         sendMessage();
     }
 }
+

@@ -20,20 +20,19 @@ class pTox : public QObject
 {
     Q_OBJECT
 public:
-    typedef enum STATUS {
-        AVAILABLE,
-        AWAY,
-        BUSY
-    } STATUS;
-    Q_ENUM(STATUS)
-
+//    typedef enum STATUS {
+//        AVAILABLE,
+//        AWAY,
+//        BUSY
+//    } STATUS;
+//    Q_ENUM(STATUS)
     struct toxFriend {
         std::string friendName;
         uint32_t friendNumber;
         uint8_t friendAddressBin[TOX_PUBLIC_KEY_SIZE];
         uint8_t friendAddressHex[TOX_PUBLIC_KEY_SIZE*2+1];
         std::string friendStatus;
-        STATUS friendConnectionStatus;
+        TOX_USER_STATUS friendConnectionStatus;
     };
 private:
     Tox *tox;
@@ -48,7 +47,7 @@ private:
     uint8_t AddressHex[TOX_ADDRESS_SIZE*2+1];
     std::string Name;
     std::string StatusMessage;
-    STATUS Status;
+    TOX_USER_STATUS Status;
     std::vector<toxFriend> friendVector;
 public:
     pTox() {}
@@ -59,8 +58,11 @@ public:
     size_t friendVectorSize();
     toxFriend friendVectorData(size_t);
     toxFriend friendVectorData(uint32_t);
+    bool isFriendVector(uint32_t);
     std::string friendName(uint32_t);
-    STATUS friendStatus(uint32_t);
+    TOX_USER_STATUS friendStatus(uint32_t);
+
+    void updateToxFriendlList();
 signals:
     void changeTable();
     void appendText(QString);
@@ -71,13 +73,14 @@ signals:
     void revivedAudioFrame(uint32_t friend_number, const int16_t *pcm, size_t sample_count, uint8_t channels, uint32_t sampling_rate);
 public slots:
     void setName(std::string Name);
-    void setStatus(pTox::STATUS status);
+    void setStatus(TOX_USER_STATUS status);
     void setStatus(std::string StatusMsg);
 
     void addFriend(uint32_t);
     void removeFriend(uint32_t);
     void clearFriendVector();
     void sendRequest(std::string Address, std::string Message);
+    void decisionRequest(std::string Address, bool decision);
 
     void sendMessage(std::string);
     void sendMessage(uint32_t, std::string);
@@ -90,14 +93,13 @@ protected:
     uint8_t *bin2hex(uint8_t * const hex, const size_t hex_maxlen, const uint8_t * const bin, const size_t bin_len);
     std::string hex2bin(const std::string &value);
     int hex2bin(unsigned char *const bin, const size_t bin_maxlen, const char *const hex, const size_t hex_len, const char *const ignore, size_t *const bin_len, const char **const hex_end);
-    inline std::string Status2String(STATUS s);
-    inline std::string Connection2String(TOX_CONNECTION c);
+    std::string Status2String(TOX_USER_STATUS s);
+    std::string Connection2String(TOX_CONNECTION c);
     bool CreateNewAccount();
     bool ReadFile();
     bool CreateFile();
     bool SaveProfile();
     void Connect();
-    void updateToxFriendlList();
 
     static void *runToxThread(void *arg);
     static void *runToxAVThread(void *arg);

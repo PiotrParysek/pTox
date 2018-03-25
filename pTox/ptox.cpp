@@ -41,6 +41,8 @@ pTox::pTox(bool newAccount, std::string FilePath)
         return;
     }
     toxav_callback_call(toxav, callback_call, NULL);
+    toxav_callback_call_state(toxav, callback_call_state, NULL);
+    toxav_callback_audio_receive_frame(toxav, callback_audio_receive_frame, NULL);
 
     //threads
     pthread_create(&tox_thread, NULL, &runToxThread, tox);
@@ -77,7 +79,7 @@ std::string pTox::getConfiguration()
     tox_self_get_status_message(tox, (uint8_t*)status_message);
     name[nameSize] = '\0';
     status_message[status_messageSize] = '\0';
-    STATUS Status = (STATUS) tox_self_get_status(tox);
+    TOX_USER_STATUS Status = tox_self_get_status(tox);
     std::cout << "Name: " << name << std::endl;
     std::cout << "Status: " << Status2String(Status) << " : " << status_message << std::endl;
 
@@ -114,6 +116,16 @@ pTox::toxFriend pTox::friendVectorData(uint32_t friendNumber)
     throw std::invalid_argument("Friend not found");
 }
 
+bool pTox::isFriendVector(uint32_t friendNumber)
+{
+    for (toxFriend f : this->friendVector) {
+        if (f.friendNumber == friendNumber) {
+            return true;
+        }
+    }
+    return false;
+}
+
 std::string pTox::friendName(uint32_t friendNumber)
 {
     for (toxFriend f : this->friendVector) {
@@ -124,15 +136,16 @@ std::string pTox::friendName(uint32_t friendNumber)
     return NULL;
 }
 
-pTox::STATUS pTox::friendStatus(uint32_t friendNumber)
+TOX_USER_STATUS pTox::friendStatus(uint32_t friendNumber)
 {
     for (toxFriend f : this->friendVector) {
         if (f.friendNumber == friendNumber) {
             return f.friendConnectionStatus;
         }
     }
-    return STATUS::AWAY;
+    return TOX_USER_STATUS_AWAY;
 }
+
 
 void pTox::setName(std::string Name)
 {
@@ -145,7 +158,7 @@ void pTox::setName(std::string Name)
     }
 }
 
-void pTox::setStatus(pTox::STATUS status)
+void pTox::setStatus(TOX_USER_STATUS status)
 {
     this->Status = status;
     tox_self_set_status(tox, (TOX_USER_STATUS) status);
@@ -162,6 +175,121 @@ void pTox::setStatus(std::string StatusMsg)
         std::cerr << "ERROR setStatus: " << tox_set_info_error(error) << std::endl;
     }
 }
+
+void pTox::updateToxFriendlList()
+{
+    size_t ListSize = tox_self_get_friend_list_size(tox);
+
+    if (ListSize == 0) {
+        friendVector.clear();
+    } else if (ListSize == friendVectorSize()) {
+        //UPDATE
+        for (toxFriend f : friendVector) {
+            TOX_ERR_FRIEND_QUERY error;
+            size_t friendNameSize = tox_friend_get_name_size(tox, f.friendNumber, &error);
+            if (error != TOX_ERR_FRIEND_QUERY_OK) {
+                std::cerr << "ERROR Update friend - name: " << tox_friend_querry_error(error) << std::endl;
+                return;
+            } else if (friendNameSize == 0) {
+                f.friendName = "Anonymous";
+            } else {
+                uint8_t tempName[TOX_MAX_NAME_LENGTH+1];
+                tox_friend_get_name(tox, f.friendNumber, tempName, &error);
+                f.friendName = reinterpret_cast<char const*>(tempName);
+                f.friendName += '\0';
+            }
+
+            size_t friendStatusMessageSize = tox_friend_get_status_message_size(tox, f.friendNumber, &error);
+            if (error != TOX_ERR_FRIEND_QUERY_OK) {
+                std::cerr << "ERROR Update friend - status message size: " << tox_friend_querry_error(error) << std::endl;
+                return;
+            } else {
+                uint8_t *statusMessage = new uint8_t[friendStatusMessageSize];
+                tox_friend_get_status_message(tox, f.friendNumber, statusMessage, &error);
+                if (error != TOX_ERR_FRIEND_QUERY_OK) {
+                    std::cerr << "ERROR Update friend - status message: " << tox_friend_querry_error(error) << std::endl;
+                    return;
+                }
+            }
+
+            f.friendConnectionStatus = tox_friend_get_status(tox, f.friendNumber, &error);
+            if (error != TOX_ERR_FRIEND_QUERY_OK) {
+                std::cerr << "ERROR Update friend - status message size: " << tox_friend_querry_error(error) << std::endl;
+                return;
+            }
+        }
+    } else {
+        uint32_t *FriendList = new uint32_t[ListSize];
+        tox_self_get_friend_list(tox, FriendList);
+
+        if (ListSize > friendVectorSize()) {
+            //ADD
+            for (size_t i = 0; i < ListSize; ++i) {
+                if (!isFriendVector(FriendList[i])) {
+                    struct toxFriend f;
+                    TOX_ERR_FRIEND_QUERY error;
+                    size_t friendNameSize = tox_friend_get_name_size(tox, FriendList[i], &error);
+                    if (error != TOX_ERR_FRIEND_QUERY_OK) {
+                        std::cerr << "ERROR CreateFriend: " << tox_friend_querry_error(error) << std::endl;
+                        return;
+                    } else if (friendNameSize == 0) {
+                        f.friendName = "Anonymous";
+                    } else {
+                        uint8_t tempName[TOX_MAX_NAME_LENGTH+1];
+                        tox_friend_get_name(tox, FriendList[i], tempName, &error);
+                        f.friendName = reinterpret_cast<char const*>(tempName);
+                        f.friendName += '\0';
+                    }
+
+                    f.friendNumber = FriendList[i];
+                    TOX_ERR_FRIEND_GET_PUBLIC_KEY error2;
+                    if (!tox_friend_get_public_key(tox, f.friendNumber, f.friendAddressHex, &error2)) {
+                        std::cerr << "ERROR CreateFriend get public key: " << f.friendName << " ERROR: " << error2 << std::endl;
+                        return;
+                    } else {
+                        hex2bin(f.friendAddressBin, sizeof(f.friendAddressBin), (const char*)f.friendAddressHex, sizeof(f.friendAddressHex), NULL, NULL, NULL);
+                    }
+                    friendVector.push_back(f);
+                }
+            }
+        } else {
+            //REMOVE
+            for (std::vector<toxFriend>::iterator it = friendVector.begin() ; it != friendVector.end(); ++it) {
+                bool isElement = false;
+                for (size_t i = 0; i < ListSize; ++i) {
+                    if (isFriendVector(FriendList[i])) {
+                        isElement = true;
+
+                        break;
+                    }
+                }
+                if (!isElement) {
+                    friendVector.erase(it);
+                }
+            }
+        }
+
+        delete [] FriendList;
+        updateToxFriendlList();
+    }
+
+    emit changeTable();
+}
+
+std::string pTox::Status2String(TOX_USER_STATUS s)
+{
+    switch (s) {
+    case TOX_USER_STATUS_NONE:
+        return "AVAILABLE";
+    case TOX_USER_STATUS_AWAY:
+        return "AWAY";
+    case TOX_USER_STATUS_BUSY:
+        return "BUSY";
+    default:
+        return "unknown";
+    }
+}
+
 
 void pTox::addFriend(uint32_t friendNumber)
 {
@@ -184,7 +312,7 @@ void pTox::addFriend(uint32_t friendNumber)
         f.friendName += '\0';
     }
 
-    f.friendConnectionStatus = (STATUS) tox_friend_get_status(tox, friendNumber, &error);
+    f.friendConnectionStatus = tox_friend_get_status(tox, friendNumber, &error);
     if (error != TOX_ERR_FRIEND_QUERY_OK) {
         std::cerr << "ERROR addFriend Connection status: " << tox_friend_querry_error(error) << std::endl;
     }
@@ -198,10 +326,9 @@ void pTox::addFriend(uint32_t friendNumber)
         hex2bin(f.friendAddressBin, sizeof(f.friendAddressBin), (const char*)f.friendAddressHex, sizeof(f.friendAddressHex), NULL, NULL, NULL);
     }
     friendVector.push_back(f);
-    updateToxFriendlList();
-    SaveProfile();
 
-    emit changeTable();
+    SaveProfile();
+    updateToxFriendlList();
 }
 
 void pTox::sendRequest(std::string Address, std::string Message)
@@ -215,10 +342,28 @@ void pTox::sendRequest(std::string Address, std::string Message)
         return;
     }
     addFriend(FriendNumber);
-    updateToxFriendlList();
-    SaveProfile();
+}
 
-    emit changeTable();
+void pTox::decisionRequest(std::string Address, bool decision)
+{
+    std::string toxid = hex2bin(Address);
+    if (decision) {
+        TOX_ERR_FRIEND_ADD error;
+        uint32_t FriendNumber = tox_friend_add_norequest(tox, (const uint8_t*)toxid.c_str(), &error);
+        if (error != TOX_ERR_FRIEND_ADD_OK) {
+            std::cerr << "ERROR Friend request: " << Address << " error: " << tox_add_friend_error(error) << std::endl;
+            return;
+        }
+        addFriend(FriendNumber);
+    } else {
+        TOX_ERR_FRIEND_BY_PUBLIC_KEY error;
+        uint32_t FriendNumber = tox_friend_by_public_key(tox, (const uint8_t*)toxid.c_str(), &error);
+        if (error == TOX_ERR_FRIEND_BY_PUBLIC_KEY_OK) {
+            if (!tox_friend_delete(tox, FriendNumber, NULL)) {
+                std::cerr << "ERROR delete friend!"  << std::endl;
+            }
+        } //else {} //There is no such friend don't have to delete him
+    }
 }
 
 void pTox::removeFriend(uint32_t friendNumber)
@@ -231,8 +376,6 @@ void pTox::removeFriend(uint32_t friendNumber)
 
     updateToxFriendlList();
     SaveProfile();
-
-    emit changeTable();
 }
 
 void pTox::clearFriendVector()
@@ -283,8 +426,6 @@ void pTox::clearFriendVector()
     delete [] FriendList;
     updateToxFriendlList();
     SaveProfile();
-
-    emit changeTable();
 }
 
 void pTox::sendMessage(std::string msg)
@@ -433,20 +574,6 @@ int pTox::hex2bin(unsigned char * const bin, const size_t bin_maxlen, const char
     return ret;
 }
 
-std::string pTox::Status2String(pTox::STATUS s)
-{
-    switch (s) {
-    case AVAILABLE:
-        return "AVAILABLE";
-    case AWAY:
-        return "AWAY";
-    case BUSY:
-        return "BUSY";
-    default:
-        return "unknown";
-    }
-}
-
 std::string pTox::Connection2String(TOX_CONNECTION c)
 {
     switch (c) {
@@ -547,57 +674,6 @@ void pTox::Connect()
     }
 }
 
-void pTox::updateToxFriendlList()
-{
-    size_t ListSize = tox_self_get_friend_list_size(tox);
-    uint32_t *FriendList = new uint32_t[ListSize];
-
-    tox_self_get_friend_list(tox, FriendList);
-
-
-    for (size_t i = 0; i < ListSize; ++i) {
-        bool add = true;
-        for (toxFriend f : friendVector) {
-            if (f.friendNumber == FriendList[i]) {
-                add = false;
-                break;
-            }
-        }
-        if (add) {
-            struct toxFriend f;
-            TOX_ERR_FRIEND_QUERY error;
-            size_t friendNameSize = tox_friend_get_name_size(tox, FriendList[i], &error);
-            if (error != TOX_ERR_FRIEND_QUERY_OK) {
-                std::cerr << "ERROR CreateFriend: " << tox_friend_querry_error(error) << std::endl;
-                return;
-            } else if (friendNameSize == 0) {
-                f.friendName = "Anonymous";
-            } else {
-                uint8_t tempName[TOX_MAX_NAME_LENGTH+1];
-                tox_friend_get_name(tox, FriendList[i], tempName, &error);
-                f.friendName = reinterpret_cast<char const*>(tempName);
-                f.friendName += '\0';
-            }
-
-            f.friendNumber = FriendList[i];
-            TOX_ERR_FRIEND_GET_PUBLIC_KEY error2;
-            if (!tox_friend_get_public_key(tox, f.friendNumber, f.friendAddressHex, &error2)) {
-                std::cerr << "ERROR CreateFriend get public key: " << f.friendName << " ERROR: " << error2 << std::endl;
-                return;
-            } else {
-                hex2bin(f.friendAddressBin, sizeof(f.friendAddressBin), (const char*)f.friendAddressHex, sizeof(f.friendAddressHex), NULL, NULL, NULL);
-            }
-            friendVector.push_back(f);
-        }
-    }
-
-    delete [] FriendList;
-
-    SaveProfile();
-
-    emit changeTable();
-}
-
 void *pTox::runToxThread(void *arg)
 {
     Tox *t_tox = (Tox*)arg;
@@ -622,13 +698,14 @@ void *pTox::runToxAVThread(void *arg)
 
 void pTox::callback_self_connection_status(Tox *tox, TOX_CONNECTION status, void *userData)
 {
-    std::cout << "Connection status: " << status << std::endl;
     if (status == TOX_CONNECTION_NONE) {
         std::cerr << "Error with the connection!" << std::endl;
         emit PTOX->appendText("<font color=\"red\">ERROR with the connection!</font><br />");
+        emit PTOX->changeTable();
     } else {
         std::cout << "Connected to TOX, status: " << status << std::endl;
         emit PTOX->appendText("<font color=\"green\">Sucessfully connected to TOX!</font><br />");
+        emit PTOX->changeTable();
     }
 }
 
@@ -668,9 +745,9 @@ void pTox::callback_friend_status_message(Tox *tox, uint32_t friend_number, cons
 
 void pTox::callback_friend_status(Tox *tox, uint32_t friend_number, TOX_USER_STATUS status, void *user_data)
 {
-    std::cout << "Friend " << PTOX->friendName(friend_number) << " changed status for: " << PTOX->Status2String((STATUS) status) << std::endl;
+    std::cout << "Friend " << PTOX->friendName(friend_number) << " changed status for: " << PTOX->Status2String(status) << std::endl;
     PTOX->updateToxFriendlList();
-    emit PTOX->appendText(QString("Friend <b>%1</b>changed status for: %2!").arg(QString::fromStdString(PTOX->friendName(friend_number))).arg(QString::fromStdString(PTOX->Status2String((STATUS) status))));
+    emit PTOX->appendText(QString("Friend <b>%1</b>changed status for: %2!").arg(QString::fromStdString(PTOX->friendName(friend_number))).arg(QString::fromStdString(PTOX->Status2String(status))));
 }
 
 void pTox::callback_call(ToxAV *av, uint32_t friend_number, bool audio_enabled, bool video_enabled, void *user_data)
@@ -843,6 +920,8 @@ std::string pTox::toxav_call_error(TOXAV_ERR_CALL_CONTROL error)
         return "This client is currently not in a call with the friend. Before the call is answered, only CANCEL is a valid control.";
     case TOXAV_ERR_CALL_CONTROL_INVALID_TRANSITION:
         return "Happens if user tried to pause an already paused call or if trying to resume a call that is not paused.";
+    default:
+        return "Unknown error";
     }
 }
 
@@ -861,6 +940,8 @@ std::string pTox::toxav_answer_error(TOXAV_ERR_ANSWER error)
         return "The friend was valid, but they are not currently trying to initiate a call. This is also returned if this client is already in a call with the friend.";
     case TOXAV_ERR_ANSWER_INVALID_BIT_RATE:
         return "Audio or video bit rate is invalid.";
+    default:
+        return "Unknown error";
     }
 }
 
@@ -883,5 +964,7 @@ std::string pTox::toxav_send_frame_error(TOXAV_ERR_SEND_FRAME error)
         return "Either friend turned off audio or video receiving or we turned off sending for the said payload.";
     case TOXAV_ERR_SEND_FRAME_RTP_FAILED:
         return "Failed to push frame through rtp interface.";
+    default:
+        return "Unknown error";
     }
 }

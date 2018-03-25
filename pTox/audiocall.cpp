@@ -16,6 +16,7 @@ AudioCall::AudioCall(QWidget *parent, uint32_t fn) :
 
 AudioCall::~AudioCall()
 {
+    emit closeConnection();
     delete ui;
 }
 
