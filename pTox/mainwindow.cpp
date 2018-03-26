@@ -76,7 +76,11 @@ void MainWindow::sendMessage()
 
 void MainWindow::sendMessage(uint32_t val, QString TEXT)
 {
-    emit sendMessage(val, TEXT.toStdString());
+    if (TEXT.size() > 1370) {
+        QMessageBox::warning(this, "ERROR", "Your message is too long, try again!", QMessageBox::Ok);
+    } else {
+        emit sendMessage(val, TEXT.toStdString());
+    }
 }
 
 void MainWindow::changeTable()
@@ -201,7 +205,9 @@ void MainWindow::on_actionSet_name_triggered()
 
     bool OK = false;
     QString Name = QInputDialog::getText(this, "Name", "Enter your name:", QLineEdit::Normal, name, &OK);
-    if (OK && !Name.isEmpty()) {
+    if (Name.size() > 128) {
+        QMessageBox::warning(this, "ERROR Name", "Your chossen name is too long, try again!", QMessageBox::Ok);
+    } else if (OK && !Name.isEmpty()) {
         emit setName(Name.toStdString());
     }
 }
@@ -235,7 +241,9 @@ void MainWindow::on_actionSet_status_triggered()
 
     if (dialog->exec() == QDialog::Accepted) {
         emit setStatus((TOX_USER_STATUS)box->currentIndex());
-        if (!lineEdit->text().isEmpty())
+        if (lineEdit->text().size() > 1006) {
+            QMessageBox::warning(this, "ERROR Name", "Your chossen status message is too long, try again!", QMessageBox::Ok);
+        } else if (!lineEdit->text().isEmpty())
             emit setStatus(lineEdit->text().toStdString());
     }
 }

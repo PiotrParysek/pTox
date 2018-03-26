@@ -178,100 +178,39 @@ void pTox::setStatus(std::string StatusMsg)
 
 void pTox::updateToxFriendlList()
 {
+    friendVector.clear();
     size_t ListSize = tox_self_get_friend_list_size(tox);
-
-    if (ListSize == 0) {
-        friendVector.clear();
-    } else if (ListSize == friendVectorSize()) {
-        //UPDATE
-        for (toxFriend f : friendVector) {
-            TOX_ERR_FRIEND_QUERY error;
-            size_t friendNameSize = tox_friend_get_name_size(tox, f.friendNumber, &error);
-            if (error != TOX_ERR_FRIEND_QUERY_OK) {
-                std::cerr << "ERROR Update friend - name: " << tox_friend_querry_error(error) << std::endl;
-                return;
-            } else if (friendNameSize == 0) {
-                f.friendName = "Anonymous";
-            } else {
-                uint8_t tempName[TOX_MAX_NAME_LENGTH+1];
-                tox_friend_get_name(tox, f.friendNumber, tempName, &error);
-                f.friendName = reinterpret_cast<char const*>(tempName);
-                f.friendName += '\0';
-            }
-
-            size_t friendStatusMessageSize = tox_friend_get_status_message_size(tox, f.friendNumber, &error);
-            if (error != TOX_ERR_FRIEND_QUERY_OK) {
-                std::cerr << "ERROR Update friend - status message size: " << tox_friend_querry_error(error) << std::endl;
-                return;
-            } else {
-                uint8_t *statusMessage = new uint8_t[friendStatusMessageSize];
-                tox_friend_get_status_message(tox, f.friendNumber, statusMessage, &error);
-                if (error != TOX_ERR_FRIEND_QUERY_OK) {
-                    std::cerr << "ERROR Update friend - status message: " << tox_friend_querry_error(error) << std::endl;
-                    return;
-                }
-            }
-
-            f.friendConnectionStatus = tox_friend_get_status(tox, f.friendNumber, &error);
-            if (error != TOX_ERR_FRIEND_QUERY_OK) {
-                std::cerr << "ERROR Update friend - status message size: " << tox_friend_querry_error(error) << std::endl;
-                return;
-            }
-        }
-    } else {
-        uint32_t *FriendList = new uint32_t[ListSize];
-        tox_self_get_friend_list(tox, FriendList);
-
-        if (ListSize > friendVectorSize()) {
-            //ADD
-            for (size_t i = 0; i < ListSize; ++i) {
-                if (!isFriendVector(FriendList[i])) {
-                    struct toxFriend f;
-                    TOX_ERR_FRIEND_QUERY error;
-                    size_t friendNameSize = tox_friend_get_name_size(tox, FriendList[i], &error);
-                    if (error != TOX_ERR_FRIEND_QUERY_OK) {
-                        std::cerr << "ERROR CreateFriend: " << tox_friend_querry_error(error) << std::endl;
-                        return;
-                    } else if (friendNameSize == 0) {
-                        f.friendName = "Anonymous";
-                    } else {
-                        uint8_t tempName[TOX_MAX_NAME_LENGTH+1];
-                        tox_friend_get_name(tox, FriendList[i], tempName, &error);
-                        f.friendName = reinterpret_cast<char const*>(tempName);
-                        f.friendName += '\0';
-                    }
-
-                    f.friendNumber = FriendList[i];
-                    TOX_ERR_FRIEND_GET_PUBLIC_KEY error2;
-                    if (!tox_friend_get_public_key(tox, f.friendNumber, f.friendAddressHex, &error2)) {
-                        std::cerr << "ERROR CreateFriend get public key: " << f.friendName << " ERROR: " << error2 << std::endl;
-                        return;
-                    } else {
-                        hex2bin(f.friendAddressBin, sizeof(f.friendAddressBin), (const char*)f.friendAddressHex, sizeof(f.friendAddressHex), NULL, NULL, NULL);
-                    }
-                    friendVector.push_back(f);
-                }
-            }
+    uint32_t *FriendList = new uint32_t[ListSize];
+    tox_self_get_friend_list(tox, FriendList);
+    for (size_t i = 0; i < ListSize; ++i) {
+        struct toxFriend f;
+        TOX_ERR_FRIEND_QUERY error;
+        size_t friendNameSize = tox_friend_get_name_size(tox, FriendList[i], &error);
+        if (error != TOX_ERR_FRIEND_QUERY_OK) {
+            std::cerr << "ERROR CreateFriend: " << tox_friend_querry_error(error) << std::endl;
+            return;
+        } else if (friendNameSize == 0) {
+            f.friendName = "Anonymous";
         } else {
-            //REMOVE
-            for (std::vector<toxFriend>::iterator it = friendVector.begin() ; it != friendVector.end(); ++it) {
-                bool isElement = false;
-                for (size_t i = 0; i < ListSize; ++i) {
-                    if (isFriendVector(FriendList[i])) {
-                        isElement = true;
-
-                        break;
-                    }
-                }
-                if (!isElement) {
-                    friendVector.erase(it);
-                }
-            }
+            uint8_t tempName[TOX_MAX_NAME_LENGTH+1];
+            tox_friend_get_name(tox, FriendList[i], tempName, &error);
+            f.friendName = reinterpret_cast<char const*>(tempName);
+            f.friendName += '\0';
         }
 
-        delete [] FriendList;
-        updateToxFriendlList();
+        f.friendNumber = FriendList[i];
+        TOX_ERR_FRIEND_GET_PUBLIC_KEY error2;
+        if (!tox_friend_get_public_key(tox, f.friendNumber, f.friendAddressHex, &error2)) {
+            std::cerr << "ERROR CreateFriend get public key: " << f.friendName << " ERROR: " << error2 << std::endl;
+            return;
+        } else {
+            hex2bin(f.friendAddressBin, sizeof(f.friendAddressBin), (const char*)f.friendAddressHex, sizeof(f.friendAddressHex), NULL, NULL, NULL);
+        }
+        friendVector.push_back(f);
+
     }
+
+    delete [] FriendList;
 
     emit changeTable();
 }
