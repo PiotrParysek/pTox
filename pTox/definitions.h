@@ -8,7 +8,7 @@
 #define RINGINGDELAY 16
 
 /* Maximum number of simultaneous calls */
-#define MAXCALLS 8
+#define MAXCALLS 3
 
 /* Audio settings definition */
 #define AUDIOCHANNELS     1
@@ -18,12 +18,17 @@
 
 #define LEN(x) (sizeof (x) / sizeof *(x))
 
+/**
+ * @brief The node struct of Tox Nodes
+ */
 struct node {
     char const  *addr4;
     uint16_t    port;
     char const  *key;
 };
-
+/**
+ * Example array of Tox nodes
+ */
 static struct node nodes[] =
 {
 { //US&A
