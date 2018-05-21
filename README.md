@@ -1,4 +1,4 @@
-# MGR_CODE
+# pTox
 
 Simple toxcore client with basic text and audio support.
 
